@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>給与サイクル別家計プランナー</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+tailwind.config = {
+  theme: {
+    extend: {
+      colors: {
+        mint: {
+          50: '#f0fdf6', 100: '#dcfce9', 200: '#bbf7d4',
+          300: '#86efb8', 400: '#4ade8a', 500: '#22c55e',
+          600: '#16a34a', 700: '#15803d', 800: '#166534',
+          900: '#14532d'
+        }
+      }
+    }
+  }
+}
+</script>
+</head>
+<body class="bg-mint-50 min-h-screen font-sans">
+
+<div class="max-w-xl mx-auto px-4 py-6">
+  <h1 class="text-3xl font-bold text-mint-700 mb-1 text-center">💴 給与サイクル別家計プランナー</h1>
+  <p class="text-mint-500 text-center text-sm mb-6">封筒予算で給与から支出を管理</p>
+
+  <!-- Pay Setup -->
+  <div class="bg-white rounded-2xl shadow-md p-5 mb-5 border border-mint-100">
+    <h2 class="text-base font-semibold text-mint-700 mb-3">給与設定</h2>
+    <div class="grid grid-cols-2 gap-3 mb-3">
+      <div>
+        <label class="text-xs text-mint-600 mb-1 block" for="payAmount">給与額 (¥)</label>
+        <input id="payAmount" type="number" min="0" placeholder="300000" aria-label="給与額"
+          class="w-full border border-mint-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-mint-400">
+      </div>
+      <div>
+        <label class="text-xs text-mint-600 mb-1 block" for="payFreq">支払い頻度</label>
+        <select id="payFreq" aria-label="支払い頻度"
+          class="w-full border border-mint-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-mint-400">
+          <option value="weekly">毎週</option>
+          <option value="biweekly">隔週</option>
+          <option value="semimonthly">半月</option>
+          <option value="monthly" selected>月次</option>
+        </select>
+      </div>
+    </div>
+    <div>
+      <label class="text-xs text-mint-600 mb-1 block" for="nextPayDate">次の給与日</label>
+      <input id="nextPayDate" type="date" aria-label="次の給与日"
+        class="w-full border border-mint-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-mint-400">
+    </div>
+    <button id="saveSettingsBtn" aria-label="給与設定を保存"
+      class="mt-3 w-full bg-mint-500 hover:bg-mint-600 text-white font-semibold rounded-lg py-2 text-sm transition-colors">
+      設定を保存
+    </button>
+  </div>
+
+  <!-- Summary Cards -->
+  <div id="summaryCards" class="grid grid-cols-2 gap-3 mb-5 hidden">
+    <div class="bg-white rounded-2xl shadow-sm p-4 border border-mint-100 text-center">
+      <p class="text-xs text-mint-500 mb-1">配分済み</p>
+      <p id="sumAllocated" class="text-xl font-bold text-mint-700">¥0</p>
+    </div>
+    <div class="bg-white rounded-2xl shadow-sm p-4 border border-mint-100 text-center">
+      <p class="text-xs text-mint-500 mb-1">未配分</p>
+      <p id="sumUnallocated" class="text-xl font-bold text-mint-400">¥0</p>
+    </div>
+    <div class="bg-white rounded-2xl shadow-sm p-4 border border-mint-100 text-center">
+      <p class="text-xs text-mint-500 mb-1">給与日まで</p>
+      <p id="sumDays" class="text-xl font-bold text-mint-700">—日</p>
+    </div>
+    <div class="bg-white rounded-2xl shadow-sm p-4 border border-mint-100 text-center">
+      <p class="text-xs text-mint-500 mb-1">1日あたり予算</p>
+      <p id="sumDaily" class="text-xl font-bold text-mint-500">¥—</p>
+    </div>
+  </div>
+
+  <!-- Bar Chart -->
+  <div id="chartSection" class="bg-white rounded-2xl shadow-md p-5 mb-5 border border-mint-100 hidden">
+    <h2 class="text-base font-semibold text-mint-700 mb-3">カテゴリ配分</h2>
+    <div id="barChart" class="space-y-2"></div>
+  </div>
+
+  <!-- Add Category -->
+  <div class="bg-white rounded-2xl shadow-md p-5 mb-5 border border-mint-100">
+    <h2 class="text-base font-semibold text-mint-700 mb-3">支出カテゴリを追加</h2>
+    <div class="flex gap-2 mb-2">
+      <input id="catName" type="text" placeholder="家賃" maxlength="20" aria-label="カテゴリ名"
+        class="flex-1 border border-mint-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-mint-400">
+      <input id="catAmount" type="number" min="0" placeholder="金額 (¥)" aria-label="金額"
+        class="w-32 border border-mint-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-mint-400">
+      <button id="addCatBtn" aria-label="カテゴリを追加"
+        class="bg-mint-500 hover:bg-mint-600 text-white font-semibold rounded-lg px-4 py-2 text-sm transition-colors">
+        追加
+      </button>
+    </div>
+    <!-- Quick add presets -->
+    <div class="flex flex-wrap gap-2 mt-2">
+      <span class="text-xs text-mint-400">クイック追加:</span>
+      <script>
+        const quickCats = ['家賃','食費','光熱費','交通費','通信費','保険','娯楽','貯蓄'];
+        quickCats.forEach(c => {
+          document.write('<button class="quick-cat bg-mint-50 hover:bg-mint-100 text-mint-600 text-xs rounded-lg px-2 py-1 border border-mint-200 transition-colors" aria-label="' + c + ' をクイック追加" data-cat="' + c + '">' + c + '</button>');
+        });
+      </script>
+    </div>
+  </div>
+
+  <!-- Categories List -->
+  <div id="catList" class="space-y-2 mb-5"></div>
+
+  <!-- Frequency info -->
+  <div id="freqInfo" class="bg-mint-100 rounded-xl p-3 text-xs text-mint-700 text-center hidden"></div>
+</div>
+
+<script>
+(function() {
+  'use strict';
+
+  const STORAGE_KEY = 'pay-period-budget';
+  const COLORS = [
+    'bg-mint-400','bg-emerald-400','bg-teal-400','bg-green-400',
+    'bg-cyan-400','bg-lime-400','bg-mint-300','bg-emerald-300'
+  ];
+
+  function defaultData() {
+    return { payAmount: 0, payFreq: 'monthly', nextPayDate: '', categories: [] };
+  }
+
+  function load() {
+    try { return Object.assign(defaultData(), JSON.parse(localStorage.getItem(STORAGE_KEY))); }
+    catch(e) { return defaultData(); }
+  }
+
+  function save(data) {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  }
+
+  function freqDays(freq) {
+    return { weekly: 7, biweekly: 14, semimonthly: 15.2, monthly: 30.4 }[freq] || 30;
+  }
+
+  function freqLabel(freq) {
+    return { weekly: '毎週', biweekly: '隔週', semimonthly: '半月払い', monthly: '月次' }[freq] || '';
+  }
+
+  function calcDaysUntil(dateStr) {
+    if (!dateStr) return null;
+    const now = new Date(); now.setHours(0,0,0,0);
+    const pay = new Date(dateStr + 'T00:00:00');
+    const diff = Math.ceil((pay - now) / 86400000);
+    return diff;
+  }
+
+  function fmt(n) {
+    return '¥' + Math.round(n).toLocaleString('ja-JP');
+  }
+
+  function renderAll() {
+    const data = load();
+
+    // Populate form
+    document.getElementById('payAmount').value = data.payAmount || '';
+    document.getElementById('payFreq').value = data.payFreq;
+    document.getElementById('nextPayDate').value = data.nextPayDate;
+
+    const totalAllocated = data.categories.reduce((s, c) => s + (c.amount || 0), 0);
+    const unallocated = (data.payAmount || 0) - totalAllocated;
+    const days = calcDaysUntil(data.nextPayDate);
+    const dailyBudget = days > 0 ? unallocated / days : 0;
+
+    // Summary
+    const hasPay = data.payAmount > 0;
+    const summaryEl = document.getElementById('summaryCards');
+    summaryEl.classList.toggle('hidden', !hasPay);
+    if (hasPay) {
+      document.getElementById('sumAllocated').textContent = fmt(totalAllocated);
+      const unallocEl = document.getElementById('sumUnallocated');
+      unallocEl.textContent = fmt(unallocated);
+      unallocEl.classList.toggle('text-red-500', unallocated < 0);
+      unallocEl.classList.toggle('text-mint-400', unallocated >= 0);
+      document.getElementById('sumDays').textContent = days !== null ? days + '日' : '—日';
+      document.getElementById('sumDaily').textContent = days > 0 ? fmt(dailyBudget) : '¥—';
+
+      const freqEl = document.getElementById('freqInfo');
+      freqEl.classList.remove('hidden');
+      freqEl.textContent = freqLabel(data.payFreq) + '払い（' + freqDays(data.payFreq).toFixed(0) + '日サイクル）　給与額: ' + fmt(data.payAmount);
+    } else {
+      document.getElementById('freqInfo').classList.add('hidden');
+    }
+
+    // Bar chart
+    const chartSection = document.getElementById('chartSection');
+    const barChart = document.getElementById('barChart');
+    barChart.textContent = '';
+    if (data.categories.length > 0 && data.payAmount > 0) {
+      chartSection.classList.remove('hidden');
+      data.categories.forEach((cat, i) => {
+        const ratio = Math.min(1, cat.amount / data.payAmount) * 100;
+        const row = document.createElement('div');
+        row.className = 'flex items-center gap-2';
+
+        const label = document.createElement('span');
+        label.className = 'text-xs text-mint-700 w-16 shrink-0 text-right';
+        label.textContent = cat.name;
+
+        const barBg = document.createElement('div');
+        barBg.className = 'flex-1 bg-mint-100 rounded-full h-5 overflow-hidden';
+        const bar = document.createElement('div');
+        bar.className = (COLORS[i % COLORS.length]) + ' h-5 rounded-full transition-all duration-500';
+        bar.style.width = ratio + '%';
+        barBg.appendChild(bar);
+
+        const amtLabel = document.createElement('span');
+        amtLabel.className = 'text-xs text-mint-600 w-20 shrink-0';
+        amtLabel.textContent = fmt(cat.amount);
+
+        row.appendChild(label);
+        row.appendChild(barBg);
+        row.appendChild(amtLabel);
+        barChart.appendChild(row);
+      });
+    } else {
+      chartSection.classList.add('hidden');
+    }
+
+    // Category list
+    const catList = document.getElementById('catList');
+    catList.textContent = '';
+    data.categories.forEach((cat, i) => {
+      const card = document.createElement('div');
+      card.className = 'bg-white rounded-xl shadow-sm p-3 border border-mint-100 flex items-center justify-between';
+
+      const left = document.createElement('div');
+      left.className = 'flex items-center gap-3';
+
+      const dot = document.createElement('div');
+      dot.className = COLORS[i % COLORS.length] + ' w-3 h-3 rounded-full shrink-0';
+
+      const nameEl = document.createElement('span');
+      nameEl.className = 'text-sm font-medium text-mint-800';
+      nameEl.textContent = cat.name;
+
+      left.appendChild(dot);
+      left.appendChild(nameEl);
+
+      const right = document.createElement('div');
+      right.className = 'flex items-center gap-3';
+
+      const amtEl = document.createElement('span');
+      amtEl.className = 'text-sm font-semibold text-mint-600';
+      amtEl.textContent = fmt(cat.amount);
+
+      const del = document.createElement('button');
+      del.setAttribute('aria-label', cat.name + ' を削除');
+      del.className = 'text-mint-300 hover:text-red-400 text-lg leading-none transition-colors';
+      del.textContent = '×';
+      del.addEventListener('click', () => {
+        const d = load();
+        d.categories.splice(i, 1);
+        save(d);
+        renderAll();
+      });
+
+      right.appendChild(amtEl);
+      right.appendChild(del);
+      card.appendChild(left);
+      card.appendChild(right);
+      catList.appendChild(card);
+    });
+  }
+
+  document.getElementById('saveSettingsBtn').addEventListener('click', () => {
+    const data = load();
+    data.payAmount = parseFloat(document.getElementById('payAmount').value) || 0;
+    data.payFreq = document.getElementById('payFreq').value;
+    data.nextPayDate = document.getElementById('nextPayDate').value;
+    save(data);
+    renderAll();
+  });
+
+  document.getElementById('addCatBtn').addEventListener('click', () => {
+    const name = document.getElementById('catName').value.trim();
+    const amount = parseFloat(document.getElementById('catAmount').value) || 0;
+    if (!name) { alert('カテゴリ名を入力してください'); return; }
+    if (amount <= 0) { alert('金額を入力してください'); return; }
+    const data = load();
+    data.categories.push({ name, amount });
+    save(data);
+    document.getElementById('catName').value = '';
+    document.getElementById('catAmount').value = '';
+    renderAll();
+  });
+
+  document.querySelectorAll('.quick-cat').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.getElementById('catName').value = btn.dataset.cat;
+      document.getElementById('catAmount').focus();
+    });
+  });
+
+  // Set default next pay date to first of next month
+  const today = new Date();
+  const firstNext = new Date(today.getFullYear(), today.getMonth() + 1, 1);
+  document.getElementById('nextPayDate').value = firstNext.toISOString().split('T')[0];
+
+  renderAll();
+})();
+</script>
+</body>
+</html>
